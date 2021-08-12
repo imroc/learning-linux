@@ -16,3 +16,17 @@ systemd,1 --system --deserialize 21
                   └─restorer,1004089 ../etc/config.xml
                       └─{restorer},1004093
 ```
+
+## 查找异常状态的进程
+
+查看 D 状态的进程:
+
+```bash
+ps -eo pid,ppid,stat,command | awk '{if ($3 ~ /D/) {print $0}}'
+```
+
+查看僵尸进程:
+
+```bash
+ps -eo pid,ppid,stat,command | awk '{if ($3 ~ /Z/) {print $0}}'
+```
