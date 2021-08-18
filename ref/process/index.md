@@ -30,3 +30,16 @@ ps -eo pid,ppid,stat,command | awk '{if ($3 ~ /D/) {print $0}}'
 ```bash
 ps -eo pid,ppid,stat,command | awk '{if ($3 ~ /Z/) {print $0}}'
 ```
+
+## 查找 fork 较多的进程或线程
+
+查看使用相同启动命令的进程/线程数量排行:
+```bash
+ps -eLo command | sort | uniq -c | sort -rn | head -50
+```
+
+统计线程数排名
+
+```bash
+printf "NUM\tPID\tCOMMAND\n" && ps -eLf | awk '{$1=null;$3=null;$4=null;$5=null;$6=null;$7=null;$8=null;$9=null;print}' | sort |uniq -c |sort -rn | head -10
+```
