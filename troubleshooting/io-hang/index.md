@@ -1,5 +1,5 @@
 ---
-title: "排查 IO hang 住"
+title: "排查 IO 高负载"
 type: book
 date: "2021-07-27"
 ---
@@ -46,4 +46,48 @@ iotop -oP
 pidstat -d 1
 # 只看某个进程
 pidstat -d 1 -p 3394470
+```
+
+## 使用 ebpf 抓高 IOPS 进程
+
+安装 bcc-tools:
+```bash
+yum install -y bcc-tools
+```
+
+分析:
+```bash
+$ cd /usr/share/bcc/tools
+$ ./biosnoop 5 > io.txt
+$ cat io.txt | awk '{print $3,$2,$4,$5}' | sort | uniq -c | sort -rn | head -10
+   6850 3356537 containerd vdb R
+   1294 3926934 containerd vdb R
+    864 1670 xfsaild/vdb vdb W
+    578 3953662 kworker/u180:1 vda W
+    496 3540267 logsys_cfg_cli vdb R
+    459 1670 xfsaild/vdb vdb R
+    354 3285936 php-fpm vdb R
+    340 3285934 php-fpm vdb R
+    292 2952592 sap1001 vdb R
+    273 324710 python vdb R
+$ pstree -apnhs 3356537
+systemd,1 --switched-root --system --deserialize 22
+  └─containerd,3895
+      └─{containerd},3356537    
+$ timeout 10 strace -fp 3895 > strace.txt 2>&1
+# vdb 的 IOPS 高，vdb 挂载到了 /data 目录，这里过滤下 "/data"
+$ grep "/data" strace.txt | tail -10
+[pid 19562] newfstatat(AT_FDCWD, "/data/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/6974/fs/data/log/monitor/snaps/20211010/ps-2338.log", {st_mode=S_IFREG|0644, st_size=6509, ...}, AT_SYMLINK_NOFOLLOW) = 0
+[pid 19562] newfstatat(AT_FDCWD, "/data/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/6974/fs/data/log/monitor/snaps/20211010/ps-2339.log", {st_mode=S_IFREG|0644, st_size=6402, ...}, AT_SYMLINK_NOFOLLOW) = 0
+[pid 19562] newfstatat(AT_FDCWD, "/data/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/6974/fs/data/log/monitor/snaps/20211010/ps-2340.log", {st_mode=S_IFREG|0644, st_size=6509, ...}, AT_SYMLINK_NOFOLLOW) = 0
+[pid 19562] newfstatat(AT_FDCWD, "/data/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/6974/fs/data/log/monitor/snaps/20211010/ps-2341.log", {st_mode=S_IFREG|0644, st_size=6509, ...}, AT_SYMLINK_NOFOLLOW) = 0
+[pid 19562] newfstatat(AT_FDCWD, "/data/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/6974/fs/data/log/monitor/snaps/20211010/ps-2342.log", {st_mode=S_IFREG|0644, st_size=6970, ...}, AT_SYMLINK_NOFOLLOW) = 0
+[pid 19562] newfstatat(AT_FDCWD, "/data/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/6974/fs/data/log/monitor/snaps/20211010/ps-2343.log", {st_mode=S_IFREG|0644, st_size=6509, ...}, AT_SYMLINK_NOFOLLOW) = 0
+[pid 19562] newfstatat(AT_FDCWD, "/data/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/6974/fs/data/log/monitor/snaps/20211010/ps-2344.log", {st_mode=S_IFREG|0644, st_size=6402, ...}, AT_SYMLINK_NOFOLLOW) = 0
+[pid 19562] newfstatat(AT_FDCWD, "/data/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/6974/fs/data/log/monitor/snaps/20211010/ps-2345.log",  <unfinished ...>
+[pid 19562] newfstatat(AT_FDCWD, "/data/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/6974/fs/data/log/monitor/snaps/20211010/ps-2346.log", {st_mode=S_IFREG|0644, st_size=7756, ...}, AT_SYMLINK_NOFOLLOW) = 0
+[pid 19562] newfstatat(AT_FDCWD, "/data/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/6974/fs/data/log/monitor/snaps/20211010/ps-2347.log", Process 3895 detached
+$ grep "/data" strace.txt > data.txt
+# 合并且排序，自行用脚本分析下哪些文件操作多
+$ cat data.txt | awk -F '"' '{print $2}' | sort | uniq -c | sort -n > data-sorted.txt
 ```
