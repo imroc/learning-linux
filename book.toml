@@ -1,0 +1,17 @@
+[book]
+authors = ["roc"]
+language = "zh_CN"
+multilingual = false
+src = "src"
+title = "Linux 学习笔记"
+
+[output.html]
+additional-css = ["style.css"]
+additional-js = ["custom.js", "bigPicture.js"]
+git-repository-url = "https://github.com/imroc/learning-linux"
+edit-url-template = "https://github.com/imroc/learning-linux/edit/master/{path}"
+site-url="/linux/"
+
+[output.html.fold]
+enable = true
+level = 1
